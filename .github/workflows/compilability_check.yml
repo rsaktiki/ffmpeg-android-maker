@@ -1,21 +1,45 @@
-name: Compilability check
-on: [ push, pull_request ]
+name: Build FFmpeg for Android
+
+on:
+  push:
+  pull_request:
+
 jobs:
   build:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     strategy:
       matrix:
-        abi: [ "armeabi-v7a", "arm64-v8a", "x86", "x86_64" ]
+        abi: [ "armeabi-v7a", "arm64-v8a" ]
       fail-fast: false
+
     steps:
-      - uses: actions/checkout@v4
+      # Checkout the repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Setup the environment
+      # Install dependencies
+      - name: Install build tools
         run: |
-          sudo apt install meson nasm ninja-build
+          sudo apt update
+          sudo apt install -y meson nasm ninja-build zip
 
-      - name: Executing the script
+      # Execute the build script
+      - name: Build FFmpeg for ${{ matrix.abi }}
         run: |
           export ANDROID_SDK_HOME=$ANDROID_HOME
           export ANDROID_NDK_HOME=$ANDROID_NDK_LATEST_HOME
           ./ffmpeg-android-maker.sh -all-free -all-gpl -android=24 -abis=${{ matrix.abi }}
+
+      # Archive build output
+      - name: Archive build output
+        run: |
+          mkdir -p artifacts/${{ matrix.abi }}
+          mv output/* artifacts/${{ matrix.abi }}/
+          zip -r artifacts_${{ matrix.abi }}.zip artifacts/${{ matrix.abi }}
+
+      # Upload build artifacts
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: ffmpeg-build-${{ matrix.abi }}
+          path: artifacts_${{ matrix.abi }}.zip
